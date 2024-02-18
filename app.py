@@ -6,7 +6,7 @@ import numpy as np
 from contextlib import contextmanager
 
 from sklearn.metrics import roc_auc_score, roc_curve
-from data_preprocessing import preprocess_data, scale_and_encode_features, split_data
+from data_preprocessing import preprocess_data, remove_outliers, scale_and_encode_features, split_data
 
 from model_training import ModelTrainer
 
@@ -74,6 +74,7 @@ def plot_pie_chart(data, target):
         plt.legend(data[target].unique())
         plt.title('Dağılım')
 
+@st.cache_resource
 def plot_histograms(data):
     numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
     with st_plt_figure(figsize=(18, 15)) as ax:
@@ -103,8 +104,8 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     st.title("Veri Analizi ve Preprocessing")
-    st.sidebar.header('Veri Seti Seçimi')
-    st.sidebar.info("Bu uygulama, Wisconsin Breast Cancer datasetine ozellestirilmis bir aplikasyon olsa da, diger sayisal bazli veri setleri icin de kullanilabilir.")
+    st.sidebar.info("Bu uygulama, Wisconsin Breast Cancer datasetine ozellestirilmis bir aplikasyon olsa da, diger sayisal agirlikli classification veri setleri icin de kullanilabilir.")
+    st.sidebar.header('Veri Seti Seçimi', divider=True)
     dataset_options = {
         "Breast Cancer Wisconsin (Diagnostic) Data Set": "dataset/bcwds.csv",
     }
@@ -130,8 +131,8 @@ def main():
     st.write("Veri setinde, her bir hücrenin ölçümleri ve hücrelerin kanserli olup olmadığını gösteren 'diagnosis' sütunu bulunmaktadır. Bu sutunlari, Malign/M 1 ve Benign/B 0 olacak sekilde duzenleyelim. Ayrica ID ve Unnamed: 32 adında iki sütun bulunmaktadır. Bu sütunlar veri seti için gereksiz olduğu için çıkarılacaktır.")
     
     st.write("Veri setindeki histogramlari inceleyerek outlier analizi yapabiliriz.")
-    #with st.expander("Veri Seti Histogramlari"):
-    #    plot_histograms(data)
+    with st.expander("Veri Seti Histogramlari"):
+        plot_histograms(data)
 
     st.header("Data Preprocessing")
     all_columns = data.columns.to_list()
@@ -147,7 +148,7 @@ def main():
     
     st.sidebar.metric("Kullanilan Veri Satir Sayısı", processed_data.shape[0])
     
-    st.sidebar.header("Encoding ve Scaling")
+    st.sidebar.header("Encoding ve Scaling", divider=True)
     st.sidebar.subheader("Hedef Degisken Secimi")
     target = st.sidebar.selectbox("Hedef Değişken", processed_data.columns, index=0)
     st.write("Secilen Y/hedef degeri:", target)
@@ -156,7 +157,6 @@ def main():
 
     enable_custom_encoding = st.sidebar.checkbox("Custom Encoding? ", value=len(processed_data[target].unique()) < 6, help="Eger hedef degiskeniniz binary degilse, custom encoding yapabilirsiniz.")
     if enable_custom_encoding:
-        st.sidebar.subheader(f"'{target}' Icin Custom Encoding")
         processed_data = custom_encode_target(processed_data, target)
 
     if st.sidebar.checkbox("Standard Scaler ile Preprocessing yapilsin mi?", value=True):
@@ -164,7 +164,12 @@ def main():
         preprocessor = scale_and_encode_features(processed_data, target, should_use_sparse)
     else:
         preprocessor = None
+    clean_outliers = st.sidebar.checkbox("Otomatik outlier temizligi? (IQR 3)", value=False)
 
+    if clean_outliers:
+        veri_sayisi = processed_data.shape[0]
+        processed_data = remove_outliers(processed_data, processed_data.columns)
+        st.sidebar.write("Temizlenen veri sayisi:", veri_sayisi - processed_data.shape[0])
     st.write("İşlenmiş Veri", processed_data.tail(10))
     st.subheader("Korelasyon Matrisi")
     st.write("Korelasyon matrisi, veri setindeki sütunlar arasındaki ilişkiyi gösterir. Cok fazla sütun varsa, korelasyon matrisi görselleştirilerek sütunlar arasındaki ilişkiler kolayca anlaşılabilir.")
@@ -189,7 +194,7 @@ def main():
     st.divider()
 
     st.title("Model Eğitimi ve Değerlendirme")
-    st.sidebar.header("Model Egitimi")
+    st.sidebar.header("Model Egitimi", divider=True)
     model_choice = st.sidebar.selectbox("Model Seçimi", ["KNN", "SVM", "Naive Bayes"])
 
     X_train, X_test, Y_train, Y_test = split_data(processed_data, target)
@@ -210,7 +215,7 @@ def main():
     trainer = ModelTrainer(model_choice, preprocessor)
     trainer.set_progress_bar(st.progress(0))
 
-    multiprocess = st.checkbox("Multiprocessing ile eğitim yapilsin mi? Progress bar kullanilamaz.")
+    multiprocess = st.checkbox("Multiprocessing ile egitim yapilsin mi?", help="Progress bar kullanilamaz. Butun cekirdekler kullanilir.")
     try:
         trainer.train_model(X_train, Y_train, multiprocess)
     except ValueError as e:
@@ -241,6 +246,9 @@ def main():
             st.metric("AUC(Area Under Curve) Score", round(roc_auc_score(Y_test, y_probs), 3))
     else:
         st.write("ROC eğrisi çizilemiyor, çünkü modelin `predict_proba` metodu yok veya multiclass bir dataset.")
+    
+    st.sidebar.divider()
+    st.sidebar.subheader("Mustafa Akcanca")
 
 
 if __name__ == "__main__":

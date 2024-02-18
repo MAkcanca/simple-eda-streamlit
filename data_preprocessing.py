@@ -1,7 +1,23 @@
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
+import streamlit as st
 
+
+def remove_outliers(data, columns):
+    for col in columns:
+        try:
+            Q1 = data[col].quantile(0.25)
+            Q3 = data[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 3 * IQR
+            upper_bound = Q3 + 3 * IQR
+
+            data = data[(data[col] >= lower_bound) & (data[col] <= upper_bound)]
+        except TypeError:
+            st.warning(f"{col} sutunu numerik olmadigi icin aykiri degerler temizlenemedi.")            
+
+    return data
 
 def split_data(data, target):
     Y = data[target]
