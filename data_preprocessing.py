@@ -1,6 +1,8 @@
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA
 import streamlit as st
 
 
@@ -44,21 +46,26 @@ def preprocess_data(data, selected_columns, missing_values_option):
         data = data.toarray()
     return data
 
-def scale_and_encode_features(data, target, should_use_sparse):
+def scale_and_encode_features(data, target, should_use_sparse, enable_pca=False, n_components=None):
     numeric_features = data.select_dtypes(include=['int64', 'float64']).columns.tolist()
     categorical_features = data.select_dtypes(include=['object']).columns.tolist()
 
     if target in numeric_features:
         numeric_features.remove(target)  # Remove target variable from numeric features if present
     # Scaling for numeric features
-    scaler = StandardScaler()
-    
+    if enable_pca:
+        numeric_pipeline = Pipeline([
+            ('scaler', StandardScaler()),
+            ('pca', PCA(n_components=n_components))
+        ])
+    else:
+        numeric_pipeline = StandardScaler()
     # Encoding for categorical features
     encoder = OneHotEncoder(handle_unknown='ignore')
 
     preprocessor = ColumnTransformer(
         transformers=[
-            ('num', scaler, numeric_features),
+            ('num', numeric_pipeline, numeric_features),
             ('cat', encoder, categorical_features)
         ], sparse_threshold=0.3 if should_use_sparse else 0)
 

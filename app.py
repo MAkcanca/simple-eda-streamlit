@@ -161,7 +161,11 @@ def main():
 
     if st.sidebar.checkbox("Standard Scaler ile Preprocessing yapilsin mi?", value=True):
         should_use_sparse = st.sidebar.checkbox("Scale icin matrix sparsity kullanilsin mi?", value=True, help="Eger veri setiniz cok buyukse, bu secenegi secerek bellek kullanimini azaltabilirsiniz. Naive Bayes icin kullanilmamalidir.")
-        preprocessor = scale_and_encode_features(processed_data, target, should_use_sparse)
+        enable_pca = st.sidebar.checkbox("PCA ile boyut indirgeme yapilsin mi?", value=False)
+        n_components = None
+        if enable_pca:
+            n_components = st.sidebar.slider("PCA icin bilesen sayisi", min_value=2, max_value=len(processed_data.select_dtypes(include=['int64', 'float64']).columns.tolist()), value=2)
+        preprocessor = scale_and_encode_features(processed_data, target, should_use_sparse, enable_pca, n_components)
     else:
         preprocessor = None
     clean_outliers = st.sidebar.checkbox("Otomatik outlier temizligi? (IQR 3)", value=False)
